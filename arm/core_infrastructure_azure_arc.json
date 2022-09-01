@@ -1,0 +1,300 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+      "workspaceName": {
+        "type": "string",
+        "metadata": {
+          "description": "Workspace name"
+        }
+      },
+      "sku": {
+        "type": "string",
+        "defaultValue": "pergb2018",
+        "allowedValues": [
+          "pergb2018",
+          "Free",
+          "Standalone",
+          "PerNode",
+          "Standard",
+          "Premium"
+        ],
+        "metadata": {
+          "description": "Pricing tier: perGB2018 or legacy tiers (Free, Standalone, PerNode, Standard or Premium), which are not available to all customers."
+        }
+      },
+      "dataRetention": {
+        "type": "int",
+        "defaultValue": 30,
+        "minValue": 7,
+        "maxValue": 730,
+        "metadata": {
+          "description": "Number of days to retain data."
+        }
+      },
+      "automationAccountName": {
+        "type": "string",
+        "metadata": {
+          "description": "Automation account name"
+        }
+      }
+    },
+    "variables": {
+        "Updates": {
+          "name": "[concat('Updates', '(', parameters('workspaceName'), ')')]",
+          "galleryName": "Updates"
+        },
+        "saved_search":"MockComputerGroup"
+    },
+    "resources": [
+      {
+        "type": "Microsoft.OperationalInsights/workspaces",
+        "apiVersion": "2020-08-01",
+        "name": "[parameters('workspaceName')]",
+        "location": "westeurope",
+        "properties": {
+          "sku": {
+            "name": "[parameters('sku')]"
+          },
+          "retentionInDays": "[parameters('dataRetention')]",
+          "features": {
+            "searchVersion": 1,
+            "legacy": 0
+          }
+        },
+        "resources":[
+          {
+            "apiVersion": "2020-08-01",
+            "type": "savedSearches",
+            "name": "[variables('saved_search')]",
+            "dependsOn": [
+              "[concat('Microsoft.OperationalInsights/workspaces/', parameters('workspaceName'))]"
+            ],
+            "properties": {
+              "category": "UpdateManagement",
+              "displayName": "[variables('saved_search')]",
+              "functionAlias": null,
+              "functionParameters": null,
+              "query": "Heartbeat | where Computer contains 'a-string-that-cant-be-matched' | distinct Computer",
+              "tags": [
+                {
+                  "name": "Group",
+                  "value": "Computer"
+                }
+              ],
+              "version": 2
+            }
+          }
+        ]
+      },
+      {
+          "apiVersion": "2015-11-01-preview",
+          "location": "westeurope",
+          "name": "[variables('Updates').name]",
+          "type": "Microsoft.OperationsManagement/solutions",
+          "id": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.OperationsManagement/solutions/', variables('Updates').name)]",
+          "dependsOn": [
+              "[concat('Microsoft.OperationalInsights/workspaces/', parameters('workspaceName'))]"
+          ],
+          "properties": {
+              "workspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces/', parameters('workspaceName'))]"
+          },
+          "plan": {
+              "name": "[variables('Updates').name]",
+              "publisher": "Microsoft",
+              "promotionCode": "",
+              "product": "[concat('OMSGallery/', variables('Updates').galleryName)]"
+          }
+      },
+      {
+        "type": "Microsoft.Automation/automationAccounts",
+        "apiVersion": "2020-01-13-preview",
+        "name": "[parameters('automationAccountName')]",
+        "location": "westeurope",
+        "dependsOn": [
+          "[parameters('workspaceName')]"
+        ],
+        "identity": {
+          "type": "SystemAssigned"
+        },
+        "properties": {
+          "sku": {
+            "name": "Basic"
+          }
+        }
+      },
+      {
+        "type": "Microsoft.Automation/automationAccounts/variables",
+        "apiVersion": "2020-01-13-preview",
+        "dependsOn": [
+          "[concat('Microsoft.Automation/automationAccounts/', parameters('automationAccountName'))]"
+        ],
+        "name": "[concat(parameters('automationAccountName'), '/' , 'aa_name')]",
+        "properties": {
+          "description": null,
+          "isEncrypted": false,
+          "value": "[concat('\"', parameters('automationAccountName'), '\"')]"
+        }
+      },
+      {
+        "type": "Microsoft.Automation/automationAccounts/variables",
+        "apiVersion": "2020-01-13-preview",
+        "dependsOn": [
+          "[concat('Microsoft.Automation/automationAccounts/', parameters('automationAccountName'))]"
+        ],
+        "name": "[concat(parameters('automationAccountName'), '/' , 'resource_group_name')]",
+        "properties": {
+          "description": "Resource group name",
+          "isEncrypted": false,
+          "value": "[concat('\"', resourceGroup().name, '\"')]"
+        }
+      },
+      {
+        "type": "Microsoft.Automation/automationAccounts/variables",
+        "apiVersion": "2020-01-13-preview",
+        "dependsOn": [
+          "[concat('Microsoft.Automation/automationAccounts/', parameters('automationAccountName'))]"
+        ],
+        "name": "[concat(parameters('automationAccountName'), '/' , 'saved_search_name')]",
+        "properties": {
+          "description": "Saved search name",
+          "isEncrypted": false,
+          "value": "[concat('\"', variables('saved_search'), '\"')]"
+        }
+      },
+      {
+        "type": "Microsoft.Automation/automationAccounts/variables",
+        "apiVersion": "2020-01-13-preview",
+        "dependsOn": [
+          "[concat('Microsoft.Automation/automationAccounts/', parameters('automationAccountName'))]"
+        ],
+        "name": "[concat(parameters('automationAccountName'), '/' , 'subscription_id')]",
+        "properties": {
+          "description": "Subscription id",
+          "isEncrypted": false,
+          "value": "[concat('\"', subscription().id, '\"')]"
+        }
+      },
+      {
+        "type": "Microsoft.Automation/automationAccounts/runbooks",
+        "apiVersion": "2019-06-01",
+        "dependsOn": [
+          "[concat('Microsoft.Automation/automationAccounts/', parameters('automationAccountName'))]"
+        ],
+        "name": "[concat(parameters('automationAccountName'), '/' , 'azure-arc-update')]",
+        "location": "westeurope",
+        "properties": {
+          "description": "This runbook assigns Azure ARC VMs to the appropriate deployment schedule, based on their tags",
+          "publishContentLink": {
+            "uri": "https://raw.githubusercontent.com/Molx32/AzureUpdateManagement/main/runbooks/azure_arc_dynamic_update.py",
+            "version": "1"
+          },
+          "runbookType": "Python3"
+        }
+      },
+      {
+        "type": "Microsoft.OperationalInsights/workspaces/linkedServices",
+        "apiVersion": "2020-08-01",
+        "name": "[concat(parameters('workspaceName'), '/' , 'Automation')]",
+        "tags": {},
+        "dependsOn": [
+            "[parameters('workspaceName')]",
+            "[parameters('automationAccountName')]"
+        ],
+        "properties": {
+          "resourceId": "[resourceId('Microsoft.Automation/automationAccounts/', parameters('automationAccountName'))]"
+        }
+      },
+      {
+        "type": "Microsoft.Automation/automationAccounts/softwareUpdateConfigurations",
+        "apiVersion": "2019-06-01",
+        "name": "[concat(parameters('automationAccountName'), '/' , 'LINUX-MON-03-00')]",
+        "dependsOn": [
+          "[concat('Microsoft.Automation/automationAccounts/', parameters('automationAccountName'))]",
+          "[resourceId('Microsoft.OperationalInsights/workspaces/linkedServices',parameters('workspaceName'), 'Automation')]"
+        ],
+        "properties": {
+          "etag":"*",
+          "scheduleInfo": {
+            "advancedSchedule": {
+              "monthDays": null,
+              "monthlyOccurrences": null,
+              "weekDays": ["Monday"]
+            },
+            "description": null,
+            "expiryTime": "9999-12-31T23:59:59.9999999+00:00",
+            "expiryTimeOffsetMinutes": 0,
+            "frequency": 3,
+            "interval": 1,
+            "isEnabled": true,
+            "startTime": "2023-04-01T03:00:00+00:00",
+            "timeZone": "Europe/Paris"
+          },
+          "tasks": {
+            "postTask": null,
+            "preTask": null
+          },
+          "updateConfiguration": {
+            "azureVirtualMachines": null,
+            "duration": "PT2H",
+            "linux": {
+                "includedPackageClassifications": "Critical, Security",
+                "excludedPackageNameMasks": null,
+                "includedPackageNameMasks": null,
+                "rebootSetting": "IfRequired"
+            },
+            "nonAzureComputerNames": null,
+            "operatingSystem": "Linux",
+            "targets": {
+              "azureQueries": null,
+              "nonAzureQueries": [
+                {
+                  "FunctionAlias": "[variables('saved_search')]",
+                  "WorkspaceId": "[resourceId('Microsoft.OperationalInsights/workspaces/', parameters('workspaceName'))]"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+          "type": "Microsoft.Authorization/roleAssignments",
+          "apiVersion": "2018-09-01-preview",
+          "name": "11111111-1111-1111-1111-111111111111",
+          "dependsOn": [
+              "[concat('Microsoft.Automation/automationAccounts/', parameters('automationAccountName'))]"
+          ],
+          "properties": {
+              "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', 'cd570a14-e51a-42ad-bac8-bafd67325302')]",
+              "principalId": "[reference(resourceId('Microsoft.Automation/automationAccounts/', parameters('automationAccountName')), '2021-06-22', 'Full').identity.principalId]",
+              "principalType":"ServicePrincipal"
+          }
+      },
+      {
+          "type": "Microsoft.Authorization/roleAssignments",
+          "apiVersion": "2018-09-01-preview",
+          "name": "22222222-2222-2222-2222-222222222222",
+          "dependsOn": [
+              "[concat('Microsoft.Automation/automationAccounts/', parameters('automationAccountName'))]"
+          ],
+          "properties": {
+              "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', 'f353d9bd-d4a6-484e-a77a-8050b599b867')]",
+              "principalId": "[reference(resourceId('Microsoft.Automation/automationAccounts/', parameters('automationAccountName')), '2021-06-22', 'Full').identity.principalId]",
+              "principalType":"ServicePrincipal"
+          }
+      },
+      {
+          "type": "Microsoft.Authorization/roleAssignments",
+          "apiVersion": "2018-09-01-preview",
+          "name": "33333333-3333-3333-3333-333333333333",
+          "dependsOn": [
+              "[concat('Microsoft.Automation/automationAccounts/', parameters('automationAccountName'))]"
+          ],
+          "properties": {
+              "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '73c42c96-874c-492b-b04d-ab87d138a893')]",
+              "principalId": "[reference(resourceId('Microsoft.Automation/automationAccounts/', parameters('automationAccountName')), '2021-06-22', 'Full').identity.principalId]",
+              "principalType":"ServicePrincipal"
+          }
+      }
+    ]
+}
