@@ -1,0 +1,100 @@
+{
+    "if": {
+    "allOf": [
+        {
+        "field": "type",
+        "equals": "Microsoft.HybridCompute/machines"
+        },
+        {
+        "field": "Microsoft.HybridCompute/machines/osName",
+        "equals": "windows"
+        }
+    ]
+    },
+    "then": {
+    "effect": "[parameters('effect')]",
+    "details": {
+        "type": "Microsoft.HybridCompute/machines/extensions",
+        "roleDefinitionIds": [
+        "/providers/Microsoft.Authorization/roleDefinitions/92aaf0da-9dab-42b6-94a3-d43ce8d16293"
+        ],
+        "existenceCondition": {
+        "allOf": [
+            {
+            "field": "Microsoft.HybridCompute/machines/extensions/type",
+            "equals": "MicrosoftMonitoringAgent"
+            },
+            {
+            "field": "Microsoft.HybridCompute/machines/extensions/publisher",
+            "equals": "Microsoft.EnterpriseCloud.Monitoring"
+            },
+            {
+            "field": "Microsoft.HybridCompute/machines/extensions/provisioningState",
+            "equals": "Succeeded"
+            }
+        ]
+        },
+        "deployment": {
+        "properties": {
+            "mode": "incremental",
+            "template": {
+            "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+            "contentVersion": "1.0.0.0",
+            "parameters": {
+                "vmName": {
+                "type": "string"
+                },
+                "location": {
+                "type": "string"
+                },
+                "logAnalytics": {
+                "type": "string"
+                }
+            },
+            "variables": {
+                "vmExtensionName": "MicrosoftMonitoringAgent",
+                "vmExtensionPublisher": "Microsoft.EnterpriseCloud.Monitoring",
+                "vmExtensionType": "MicrosoftMonitoringAgent"
+            },
+            "resources": [
+                {
+                "name": "[concat(parameters('vmName'), '/', variables('vmExtensionName'))]",
+                "type": "Microsoft.HybridCompute/machines/extensions",
+                "location": "[parameters('location')]",
+                "apiVersion": "2019-12-12",
+                "properties": {
+                    "publisher": "[variables('vmExtensionPublisher')]",
+                    "type": "[variables('vmExtensionType')]",
+                    "settings": {
+                    "workspaceId": "[reference(parameters('logAnalytics'), '2015-03-20').customerId]",
+                    "stopOnMultipleConnections": "true"
+                    },
+                    "protectedSettings": {
+                    "workspaceKey": "[listKeys(parameters('logAnalytics'), '2015-03-20').primarySharedKey]"
+                    }
+                }
+                }
+            ],
+            "outputs": {
+                "policy": {
+                "type": "string",
+                "value": "[concat('Enabled extension for VM', ': ', parameters('vmName'))]"
+                }
+            }
+            },
+            "parameters": {
+            "vmName": {
+                "value": "[field('name')]"
+            },
+            "location": {
+                "value": "[field('location')]"
+            },
+            "logAnalytics": {
+                "value": "[parameters('logAnalytics')]"
+            }
+            }
+        }
+        }
+    }
+    }
+}
