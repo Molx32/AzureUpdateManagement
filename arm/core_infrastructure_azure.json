@@ -118,7 +118,7 @@
                     "frequency": 3,
                     "interval": 1,
                     "isEnabled": true,
-                    "startTime": "2023-04-01T03:00:00+00:00",
+                    "startTime": "2024-04-01T03:00:00+00:00",
                     "timeZone": "Europe/Paris"
                   },
                   "tasks": {
@@ -176,7 +176,7 @@
                     "frequency": 3,
                     "interval": 1,
                     "isEnabled": true,
-                    "startTime": "2023-04-01T03:00:00+00:00",
+                    "startTime": "2024-04-01T03:00:00+00:00",
                     "timeZone": "Europe/Paris"
                   },
                   "tasks": {
