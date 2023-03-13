@@ -44,7 +44,7 @@
           "name": "[concat('Updates', '(', parameters('workspaceName'), ')')]",
           "galleryName": "Updates"
         },
-      "Subscription":"[concat('/subscriptions/', subscription().subscriptionId])"
+      "Subscription":"[concat('/subscriptions/', subscription().subscriptionId)]"
     },
     "resources": [
       {
