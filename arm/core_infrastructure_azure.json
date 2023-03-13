@@ -43,7 +43,8 @@
       "Updates": {
           "name": "[concat('Updates', '(', parameters('workspaceName'), ')')]",
           "galleryName": "Updates"
-        }
+        },
+      "Subscription":"[concat('/subscriptions/', subscription().subscriptionId])"
     },
     "resources": [
       {
@@ -140,10 +141,10 @@
                       "azureQueries": [
                         {
                           "locations": [],
-                          "scope": [],
+                          "scope": ["[variables('Subscription')]"],
                           "tagSettings": {
                             "tags": {
-                                "patch-test": [
+                                "patch": [
                                     "MON-03:00"
                                 ]
                             },
@@ -198,7 +199,7 @@
                       "azureQueries": [
                         {
                           "locations": [],
-                          "scope": [],
+                          "scope": ["[variables('Subscription')]"],
                           "tagSettings": {
                             "tags": {
                                 "patch-test": [
